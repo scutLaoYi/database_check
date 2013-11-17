@@ -3,12 +3,36 @@
 
 import MySQLdb
 
-#config:
-curHost = "10.0.0.4"
-curUser = "shengwu"
-curPass = "qfire"
-curDb = "cake_db"
 
+def getElement(data):
+	pieces = data.split(':')
+	return pieces[1].strip(' \n')
+
+def configReading():
+	try:
+		file = open('config.ini')
+
+		config = {}
+		for line in file:
+			if line.startswith('#'):
+				continue
+			if line.startswith('Host'):
+				config['Host'] = getElement(line)
+			if line.startswith('User'):
+				config['User'] = getElement(line)
+			if line.startswith('Password'):
+				config['Pass'] = getElement(line)
+			if line.startswith('Database'):
+				config['Database'] = getElement(line)
+				
+		file.close()
+
+	except IOError as e:
+		print "config file reading failed!"
+		print e
+		return False
+
+	return config
 
 def listTables(cur):
 	cur.execute("""show tables;""")
@@ -24,26 +48,43 @@ def printTableInfo(table):
 	for info in table:
 		print '\t', info[0],'\t' ,info[1],'\t', info[3]
 
-def mainFunc():
+def mainFunc(config):
 	#connect:
-	db = MySQLdb.connect(
-			host= curHost, 
-			user= curUser, 
-			passwd= curPass, 
-			db = curDb,
-			)
-	cur = db.cursor()
+	try:
+		db = MySQLdb.connect(
+				host= config['Host'], 
+				user= config['User'], 
+				passwd= config['Pass'], 
+				db = config['Database'],
+				)
+		cur = db.cursor()
 
-	allTables = listTables(cur) 
-	for table in allTables:
-		print "-----------", table[0], "--------------"
-		desc = describeTable(cur, table[0])
-		printTableInfo(desc)
-		print "----------------------------------------"
+	except MySQLdb.Error as e:
+		print "something wrong when try to connect the database..."
+		print e
+		return 
 
-	#close:
-	db.close()
-	cur.close()
+	try:
+		allTables = listTables(cur) 
+		for table in allTables:
+			print "-----------", table[0], "--------------"
+			desc = describeTable(cur, table[0])
+			printTableInfo(desc)
+			print "----------------------------------------"
+
+	except MySQLdb.Error as e:
+		print "something wrong when executing..."
+		print e
+
+	finally:
+		#close:
+		db.close()
+		cur.close()
 
 if __name__ == "__main__":
-	mainFunc()
+	config = configReading()
+	if config:
+		print "config reading ok. now try to connect the database..."
+		mainFunc(config)
+	else:
+		print "exit!"
